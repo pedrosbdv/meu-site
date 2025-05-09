@@ -21,20 +21,18 @@ $results = '<form id="formCotacao"><input type="hidden" name="id_cotacao" value=
 
 while ($fornecedor = mysqli_fetch_object($fornecedores)) {
     $results .= '
-    <div class="card mb-3 mt-3">
-        <div class="card-header">
+    <div class="panel panel-default">
+        <div class="panel-heading">
             <strong>' . $fornecedor->nome . '</strong>
-            <div class="form-check form-check-inline ml-3">
-                <input type="radio" class="aprovado-radio" name="fornecedor_' . $fornecedor->id . '" value="1" checked data-id="' . $fornecedor->id . '">
-                <label class="form-check-label"> Aprovado</label>
-            </div>
-            <div class="form-check form-check-inline">
-                <input type="radio" class="aprovado-radio" name="fornecedor_' . $fornecedor->id . '" value="2" data-id="' . $fornecedor->id . '">
-                <label class="form-check-label"> Não Aprovado</label>
-            </div>
+            <label class="radio-inline" style="margin-left: 20px;">
+                <input type="radio" class="aprovado-radio" name="fornecedor_' . $fornecedor->id . '" value="1" checked data-id="' . $fornecedor->id . '"> Aprovado
+            </label>
+            <label class="radio-inline">
+                <input type="radio" class="aprovado-radio" name="fornecedor_' . $fornecedor->id . '" value="2" data-id="' . $fornecedor->id . '"> Não Aprovado
+            </label>
         </div>
-        <div class="card-body">
-            <table class="table table-sm" id="tabela_' . $fornecedor->id . '">
+        <div class="panel-body">
+            <table class="table table-bordered table-condensed" id="tabela_' . $fornecedor->id . '">
                 <thead>
                     <tr>
                         <th>Selecionar</th>
@@ -42,7 +40,7 @@ while ($fornecedor = mysqli_fetch_object($fornecedores)) {
                     </tr>
                 </thead>
                 <tbody>';
-
+    
     foreach ($listaItens as $item) {
         $results .= '
                     <tr>
@@ -58,15 +56,16 @@ while ($fornecedor = mysqli_fetch_object($fornecedores)) {
     </div>';
 }
 
-$results .= '<button type="submit" class="btn btn-primary mt-3">Salvar</button></form>';
+$results .= '<button type="submit" class="btn btn-primary">Salvar</button></form>';
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
     <title>Fornecedores e Itens</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">    
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
 <div class="container mt-4">
@@ -84,16 +83,59 @@ $results .= '<button type="submit" class="btn btn-primary mt-3">Salvar</button><
 
         $('#formCotacao').on('submit', function (e) {
             e.preventDefault();
+            const form = $(this);
+
             $.ajax({
-                url: 'salvar.php',
+                url: 'gerar_resumo_json.php',
                 type: 'POST',
-                data: $(this).serialize(),
-                success: function (resp) {
-                    alert('Salvo com sucesso!');
-                    location.reload();
+                data: form.serialize(),
+                dataType: 'json',
+                success: function (dados) {
+                    if (dados.length === 0) {
+                        Swal.fire('Nenhum item selecionado', 'Selecione ao menos um item para continuar.', 'warning');
+                        return;
+                    }
+
+                    let html = '';
+                    dados.forEach(entry => {
+                        html += `<div class="panel panel-default">
+                                    <div class="panel-heading"><strong>${entry.fornecedor}</strong></div>
+                                    <div class="panel-body"><ul>`;
+                        entry.itens.forEach(item => {
+                            html += `<li>${item}</li>`;
+                        });
+                        html += `</ul></div></div>`;
+                    });
+
+                    Swal.fire({
+                        title: 'Confirmar envio?',
+                        html: html,
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sim, salvar',
+                        cancelButtonText: 'Cancelar',
+                        customClass: {
+                            htmlContainer: 'text-left'
+                        },
+                        width: '600px'
+                    }).then(result => {
+                        if (result.isConfirmed) {
+                            $.ajax({
+                                url: 'salvar.php',
+                                type: 'POST',
+                                data: form.serialize(),
+                                success: function () {
+                                    Swal.fire('Salvo com sucesso!', '', 'success').then(() => location.reload());
+                                },
+                                error: function () {
+                                    Swal.fire('Erro ao salvar!', '', 'error');
+                                }
+                            });
+                        }
+                    });
                 },
                 error: function () {
-                    alert('Erro ao salvar!');
+                    Swal.fire('Erro ao gerar resumo!', '', 'error');
                 }
             });
         });
